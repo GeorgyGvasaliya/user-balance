@@ -1,19 +1,31 @@
 package main
 
 import (
-	"github.com/gorilla/mux"
+	"github.com/julienschmidt/httprouter"
+	"github.com/spf13/viper"
+	"log"
 	"net/http"
+	"os"
+	"user-balance/config"
+	"user-balance/database"
 	"user-balance/handlers"
 )
 
 func main() {
+	if err := config.InitConfig(); err != nil {
+		log.Fatalln("Config init error", err)
+	}
 
-	r := mux.NewRouter()
+	cfg := database.Config{
+		Host:     viper.GetString("db.host"),
+		Port:     viper.GetString("db.port"),
+		User:     viper.GetString("db.username"),
+		DBName:   viper.GetString("db.dbname"),
+		Password: os.Getenv("DB_PASSWORD"),
+	}
 
-	r.HandleFunc("/get", handlers.GetUser)
-	r.HandleFunc("/add", handlers.AddMoney)
-	r.HandleFunc("/withdraw", handlers.Withdraw)
-	r.HandleFunc("/send", handlers.SendMoney)
-
-	http.ListenAndServe(":8000", r)
+	h := handlers.NewHandler(cfg)
+	router := httprouter.New()
+	h.Register(router)
+	log.Fatal(http.ListenAndServe(":"+viper.GetString("server.port"), router))
 }

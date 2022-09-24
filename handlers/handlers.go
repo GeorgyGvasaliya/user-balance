@@ -36,7 +36,6 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request, _ httprouter.P
 	query := "select * from public.users where user_id=$1"
 	var res models.User
 	err := db.QueryRow(query, userID).Scan(&res.UserID, &res.Balance)
-
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte("There is no user with such ID or wrong query"))
@@ -56,49 +55,49 @@ func (h *Handler) AddMoney(w http.ResponseWriter, r *http.Request, _ httprouter.
 	body, _ := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 
-	var m models.AddMoney
-	err := json.Unmarshal(body, &m)
+	var ch models.ChangeBalance
+	err := json.Unmarshal(body, &ch)
 	if err != nil {
 		log.Println("Cannot Unmarshal data")
 		return
 	}
 
-	// insert if not exists, update if exists
 	query := "INSERT INTO public.users (user_id, balance) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET balance=users.balance+$2;"
-	db.QueryRow(query, m.UserID, m.Money)
+	db.QueryRow(query, ch.UserID, ch.Money)
 }
 
 func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	//w.Header().Add("Content-Type", "application/json")
-	//data := db.NewPostgresDB(h.cfg)
-	//body, _ := ioutil.ReadAll(r.Body)
-	//
-	//defer r.Body.Close()
-	//
-	//var mr MoneyResponse
-	//err := json.Unmarshal(body, &mr)
-	//if err != nil {
-	//	log.Println("Cannot Unmarshal data")
-	//	return
-	//}
-	//
-	//// вообще этот кеш нужен был, чтобы при выводе средств проверять на отрицательный баланс, одним sql запросом не обойдёшься
-	//balance := h.cache[mr.Id]
-	//newBalance := balance - mr.Money
-	//if newBalance < 0 {
-	//	w.WriteHeader(http.StatusNotFound)
-	//	w.Write([]byte("You have no money to purchase"))
-	//	return
-	//}
-	//
-	//h.cache[mr.Id] = newBalance
-	//queryUpsert := "INSERT INTO public.wallet (wallet_id, user_id, balance) VALUES ($1, $1, $2) ON CONFLICT (wallet_id) DO UPDATE SET balance=wallet.balance-$2;"
-	//data.QueryRow(queryUpsert, mr.Id, mr.Money)
-	//
-	//err = data.Close()
-	//if err != nil {
-	//	log.Println("Cannot close connection")
-	//}
+	w.Header().Add("Content-Type", "application/json")
+	db := database.NewPostgresDB(h.cfg)
+	defer db.Close()
+	body, _ := ioutil.ReadAll(r.Body)
+	defer r.Body.Close()
+
+	var ch models.ChangeBalance
+	err := json.Unmarshal(body, &ch)
+	if err != nil {
+		log.Println("Cannot Unmarshal data")
+		return
+	}
+
+	queryGet := "select * from public.users where user_id=$1"
+	var res models.User
+	err = db.QueryRow(queryGet, ch.UserID).Scan(&res.UserID, &res.Balance)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("There is no user with such ID or wrong query"))
+		return
+	}
+
+	newBalance := res.Balance - ch.Money
+	if newBalance < 0 {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("You have no money to purchase"))
+		return
+	}
+
+	query := "UPDATE public.users SET balance=balance-$1 WHERE user_id=$2;"
+	db.QueryRow(query, ch.Money, ch.UserID)
 }
 
 func (h *Handler) SendMoney(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {

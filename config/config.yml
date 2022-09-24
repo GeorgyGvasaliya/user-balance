@@ -6,4 +6,4 @@ db:
   username: "postgres"
   host: "localhost"
   port: "5432"
-  dbname: "billing"
+  dbname: "user-balance"

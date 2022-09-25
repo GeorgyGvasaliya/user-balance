@@ -1,5 +1,5 @@
 # user-balance
-1. создать локальную базу данных в Postgresql user-balance -> таблицу users с 2мя полями - user_id, balance.
+1. Создаём локальную базу данных в Postgresql user-balance -> таблицу users с 2мя полями - user_id, balance.
 В переменную окружения DB_PASSWORD ставим пароль от бд.
 Сервер запускается на localhost, 3000 порт - config.yml файл
 

@@ -152,25 +152,30 @@ func (h *Handler) SendMoney(w http.ResponseWriter, r *http.Request, _ httprouter
 		return
 	}
 
-	tx, err := db.Beginx()
-	defer tx.Rollback()
+	tx, err := db.Begin()
 
 	queryWithdraw := "UPDATE public.users SET balance=balance-$1 WHERE user_id=$2;"
 	queryAdd := "UPDATE public.users SET balance=balance+$1 WHERE user_id=$2;"
 
-	var rw byte
-	row := tx.QueryRow(queryWithdraw, tr.Money, tr.FromID)
-	err = row.Scan(&rw)
+	_, err = tx.Exec(queryWithdraw, tr.Money, tr.FromID)
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(consts.ServerError))
+		tx.Rollback()
 		return
 	}
-	row = tx.QueryRow(queryAdd, tr.Money, tr.ToID)
-	err = row.Scan(&rw)
+	_, err = tx.Exec(queryAdd, tr.Money, tr.ToID)
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(consts.ServerError))
+		tx.Rollback()
 		return
 	}
 
 	if err = tx.Commit(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(consts.ServerError))
+		tx.Rollback()
 		return
 	}
 }

@@ -9,4 +9,5 @@ var (
 	BadCurrency     = "Wrong currency to convert"
 	CannotUnmarshal = "Cannot Unmarshal data"
 	NoMoney         = "You have no money to purchase"
+	ServerError     = "Internal server error"
 )

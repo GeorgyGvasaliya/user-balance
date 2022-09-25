@@ -24,7 +24,7 @@
 остальные изменяю данные, ничего в response не отдают. Только статус код.
 
 Примеры запросов.
-1. Создание пользователя с балансом ![image](https://user-images.githubusercontent.com/61359396/192157509-237c66d1-3ae5-47c9-a904-e1329fe2a032.png)
+1. Создание пользователя с балансом(или добавление денег к текущему) ![image](https://user-images.githubusercontent.com/61359396/192157509-237c66d1-3ae5-47c9-a904-e1329fe2a032.png)
 2. Получение баланса пользователя ![image](https://user-images.githubusercontent.com/61359396/192157567-6b77dd91-366c-4477-b39f-433c5a57e335.png)
 3. Попытка получить баланс несуществующего пользователя - NotFound + сообщение ![image](https://user-images.githubusercontent.com/61359396/192157614-e769cf47-7bf2-4d63-a016-0e2457e837c2.png)
 4. Получение баланса пользователя в валюте - 24 юаня ![image](https://user-images.githubusercontent.com/61359396/192157655-9f93d672-b975-4429-bb81-88ddeb253e5d.png)

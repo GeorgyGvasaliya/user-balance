@@ -7,8 +7,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"user-balance/consts"
 	"user-balance/database"
 	"user-balance/models"
+	"user-balance/utils"
 )
 
 type Handler struct {
@@ -30,19 +32,29 @@ func (h *Handler) Register(router *httprouter.Router) {
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	userID := r.URL.Query().Get("id")
+	currency := r.URL.Query().Get("currency")
 	db := database.NewPostgresDB(h.cfg)
 	defer db.Close()
 
 	query := "select * from public.users where user_id=$1"
-	var res models.User
-	err := db.QueryRow(query, userID).Scan(&res.UserID, &res.Balance)
+	var u models.User
+	err := db.QueryRow(query, userID).Scan(&u.UserID, &u.Balance)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte("There is no user with such ID or wrong query"))
+		_, _ = w.Write([]byte(consts.BadUser))
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if currency != "" {
+		u.Balance, err = utils.ConvertCurrency(currency, u.Balance)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(consts.BadCurrency))
+			return
+		}
+	}
+
+	if err := json.NewEncoder(w).Encode(u); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -58,7 +70,7 @@ func (h *Handler) AddMoney(w http.ResponseWriter, r *http.Request, _ httprouter.
 	var ch models.ChangeBalance
 	err := json.Unmarshal(body, &ch)
 	if err != nil {
-		log.Println("Cannot Unmarshal data")
+		log.Println(consts.CannotUnmarshal)
 		return
 	}
 
@@ -76,30 +88,89 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request, _ httprouter.
 	var ch models.ChangeBalance
 	err := json.Unmarshal(body, &ch)
 	if err != nil {
-		log.Println("Cannot Unmarshal data")
+		log.Println(consts.CannotUnmarshal)
 		return
 	}
 
 	queryGet := "select * from public.users where user_id=$1"
-	var res models.User
-	err = db.QueryRow(queryGet, ch.UserID).Scan(&res.UserID, &res.Balance)
+	var u models.User
+	err = db.QueryRow(queryGet, ch.UserID).Scan(&u.UserID, &u.Balance)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte("There is no user with such ID or wrong query"))
+		_, _ = w.Write([]byte(consts.BadUser))
 		return
 	}
 
-	newBalance := res.Balance - ch.Money
+	newBalance := u.Balance - ch.Money
 	if newBalance < 0 {
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte("You have no money to purchase"))
+		_, _ = w.Write([]byte(consts.NoMoney))
 		return
 	}
 
-	query := "UPDATE public.users SET balance=balance-$1 WHERE user_id=$2;"
-	db.QueryRow(query, ch.Money, ch.UserID)
+	querySet := "UPDATE public.users SET balance=balance-$1 WHERE user_id=$2;"
+	db.QueryRow(querySet, ch.Money, ch.UserID)
 }
 
 func (h *Handler) SendMoney(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	panic("todo")
+	w.Header().Add("Content-Type", "application/json")
+	db := database.NewPostgresDB(h.cfg)
+	defer db.Close()
+	body, _ := ioutil.ReadAll(r.Body)
+	defer r.Body.Close()
+
+	var tr models.TransferMoney
+	err := json.Unmarshal(body, &tr)
+	if err != nil {
+		log.Println(consts.CannotUnmarshal)
+		return
+	}
+
+	// get first user
+	queryGet1 := "select * from public.users where user_id=$1"
+	var fromUser models.User
+	err = db.QueryRow(queryGet1, tr.FromID).Scan(&fromUser.UserID, &fromUser.Balance)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(consts.BadUser))
+		return
+	}
+	// check second user exists
+	queryGet2 := "SELECT 1 FROM public.users WHERE user_id=$1"
+	var data []byte
+	err = db.QueryRow(queryGet2, tr.ToID).Scan(&data)
+	if len(data) == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(consts.BadUser))
+		return
+	}
+
+	newBalance := fromUser.Balance - tr.Money
+	if newBalance < 0 {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(consts.NoMoney))
+		return
+	}
+
+	tx, err := db.Beginx()
+	defer tx.Rollback()
+
+	queryWithdraw := "UPDATE public.users SET balance=balance-$1 WHERE user_id=$2;"
+	queryAdd := "UPDATE public.users SET balance=balance+$1 WHERE user_id=$2;"
+
+	var rw byte
+	row := tx.QueryRow(queryWithdraw, tr.Money, tr.FromID)
+	err = row.Scan(&rw)
+	if err != nil {
+		return
+	}
+	row = tx.QueryRow(queryAdd, tr.Money, tr.ToID)
+	err = row.Scan(&rw)
+	if err != nil {
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
+		return
+	}
 }

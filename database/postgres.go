@@ -2,8 +2,9 @@ package database
 
 import (
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"log"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type Config struct {

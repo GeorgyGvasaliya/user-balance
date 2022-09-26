@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/julienschmidt/httprouter"
-	"github.com/spf13/viper"
 	"log"
 	"net/http"
 	"os"
 	"user-balance/config"
 	"user-balance/database"
 	"user-balance/handlers"
+
+	"github.com/julienschmidt/httprouter"
+	"github.com/spf13/viper"
 )
 
 func main() {

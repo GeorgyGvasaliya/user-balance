@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"github.com/julienschmidt/httprouter"
-	_ "github.com/lib/pq"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -11,6 +9,9 @@ import (
 	"user-balance/database"
 	"user-balance/models"
 	"user-balance/utils"
+
+	"github.com/julienschmidt/httprouter"
+	_ "github.com/lib/pq"
 )
 
 type Handler struct {
